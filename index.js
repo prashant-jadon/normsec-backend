@@ -1,6 +1,4 @@
-const fs = require('fs');
 const axios = require('axios');
-const readline = require('readline');
 const express = require('express');
 const app = express();
 
@@ -8,7 +6,10 @@ app.use(express.json());
 
 const wordlistFile = 'subdomains.txt'; 
 
-async function checkSubdomain(subdomain, domain, outputFile) {
+// In-memory storage for subdomains
+let subdomainResults = {};
+
+async function checkSubdomain(subdomain, domain) {
     const protocols = ['http', 'https'];
     for (const protocol of protocols) {
         const url = `${protocol}://${subdomain}.${domain}`;
@@ -20,7 +21,10 @@ async function checkSubdomain(subdomain, domain, outputFile) {
             
             if (response.status === 200 || response.status === 301 || response.status === 302) {
                 console.log(`Valid subdomain found: ${url}`);
-                fs.appendFileSync(outputFile, url + '\n');
+                if (!subdomainResults[domain]) {
+                    subdomainResults[domain] = [];
+                }
+                subdomainResults[domain].push(url);
                 break;
             }
         } catch (error) {
@@ -30,8 +34,9 @@ async function checkSubdomain(subdomain, domain, outputFile) {
 }
 
 async function checkWordlistFromFile(domain) {
+    const fs = require('fs');
+    const readline = require('readline');
     const fileStream = fs.createReadStream(wordlistFile);
-    const outputFile = `${domain}.txt`; 
 
     const rl = readline.createInterface({
         input: fileStream,
@@ -41,7 +46,7 @@ async function checkWordlistFromFile(domain) {
     for await (const line of rl) {
         const name = line.trim(); 
         if (name) {
-            await checkSubdomain(name, domain, outputFile);
+            await checkSubdomain(name, domain);
         }
     }
 }
@@ -54,7 +59,7 @@ app.post('/subdomains', async (req, res) => {
     }
 
     // Send immediate response
-    res.status(202).send(`Subdomain check started for ${companyDomain}. Results will be saved in ${companyDomain}.txt`);
+    res.status(202).send(`Subdomain check started for ${companyDomain}.`);
 
     // Process the subdomain check in the background
     (async () => {
@@ -67,7 +72,16 @@ app.post('/subdomains', async (req, res) => {
     })();
 });
 
-const port = 3000;
+app.get('/results/:domain', (req, res) => {
+    const domain = req.params.domain;
+    if (subdomainResults[domain]) {
+        res.json(subdomainResults[domain]);
+    } else {
+        res.status(404).send('No results found for the domain.');
+    }
+});
+
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log(`Server running on ${port}`);
+    console.log(`Server running on http://localhost:${port}`);
 });
