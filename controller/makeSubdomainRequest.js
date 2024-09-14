@@ -1,8 +1,8 @@
-const wordlistFile = 'subdomains.txt'; 
-
+const wordlistFile = 'subdomains.txt';
+const {Subdomains} = require('../models/saveSubdomains')
 // In-memory storage for subdomains
 let subdomainResults = {};
-
+let subdomainResults403 = {};
 
 async function checkSubdomain(subdomain, domain) {
     const protocols = ['http', 'https'];
@@ -20,6 +20,21 @@ async function checkSubdomain(subdomain, domain) {
                     subdomainResults[domain] = [];
                 }
                 subdomainResults[domain].push(url);
+                await Subdomains.create({
+                    domain,
+                    subdomainResults
+                })
+                break;
+            }else if(response.status == 403){
+                console.log(`Valid subdomain found: ${url}`);
+                if (!subdomainResults403[domain]) {
+                    subdomainResults403[domain] = [];
+                }
+                subdomainResults403[domain].push(url);
+                await Subdomains.create({
+                    domain,
+                    subdomainResults403
+                })
                 break;
             }
         } catch (error) {
@@ -86,7 +101,21 @@ async function handleGetSubdomains(req,res) {
     }
 }
 
+async function handleGetSubdomains403(req,res) {
+    try {
+        const domain = req.params.domain;
+        if (subdomainResults403[domain]) {
+            res.json(subdomainResults403[domain]);
+        } else {
+            res.status(404).send('No results found for the domain.');
+        }
+    } catch (error) {
+        console.log(error)
+    }
+}
+
 module.exports = {
     handleSubdRequest,
-    handleGetSubdomains
+    handleGetSubdomains,
+    handleGetSubdomains403
 }
