@@ -6,7 +6,7 @@ const {connectTODb} = require('./connection')
 
 app.use(express.json()); 
 
-connectTODb('mongodb://127.0.0.1:27017');
+connectTODb('mongodb+srv://prashant:prashant@cluster0.zktg0fy.mongodb.net/');
 
 app.use('/subdomains',router);
 
